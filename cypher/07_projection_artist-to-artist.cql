@@ -1,62 +1,82 @@
+/* run once – creates about 70 k [:INFLUENCE] relationships */
+:auto
+CALL {
+  MATCH (c:Cover)-[:COVER_OF]->(:Song)<-[:PERFORMED]-(orig:Artist),
+        (c)<-[:PERFORMED]-(cov:Artist)
+  WHERE 1960 <= c.year <= 2020
+  WITH cov, orig, count(*) AS w
+  MERGE (cov)-[r:INFLUENCE]->(orig)
+  ON CREATE SET r.weight = 1       // unweighted hops
+} IN TRANSACTIONS OF 5000 ROWS;
+
 // 0. Drop the graph if it exists
-CALL gds.graph.exists('artistInfluence6020') YIELD exists;
-CALL apoc.when(exists,
-  'CALL gds.graph.drop("artistInfluence6020") YIELD graphName RETURN graphName',
-  'RETURN "no old projection" AS graphName',
-  {}
-) YIELD graphName;
+CALL gds.graph.drop('artistInfluence6020', false);
 
 // 1. Create a new graph projection
-/*  Directed, weighted edges:
-     source = covering artist
-     target = original artist
-     weight = number of distinct covers, 1960-2020            */
+// 2 ▸ create aggregated projection
 CALL gds.graph.project.cypher(
   'artistInfluence6020',
 
-  /* ── node query ─────────────────────────────────────────── */
+  /* nodes (all artists) */
   'MATCH (a:Artist) RETURN id(a) AS id',
 
-  /* ── edge query ─────────────────────────────────────────── */
+  /* edges: covering → original, aggregated weight */
   '
-  MATCH (cov:Cover)-[:COVER_OF]->(:Song)<-[:PERFORMED]-(orig:Artist),
-        (cov)<-[:PERFORMED]-(covering:Artist)
-  WHERE 1960 <= cov.year <= 2020
-  RETURN id(covering) AS source,
-         id(orig)     AS target,
-         count(*)     AS weight
+  MATCH (c:Cover)-[:COVER_OF]->(:Song)<-[:PERFORMED]-(orig:Artist),
+        (c)<-[:PERFORMED]-(cov:Artist)
+  WHERE 1960 <= c.year <= 2020
+  WITH id(cov)    AS source,
+       id(orig)   AS target,
+       count(*)   AS weight            // <── aggregates duplicates
+  RETURN source, target, weight
   '
 );
 
 // 2. Basic size and degree distribution
-CALL gds.graph.list('artistInfluence6020')
-YIELD nodeCount, relationshipCount, density, degreeDistribution
+/* size & degree */
+/* ── combined network-metrics query ─────────────────────────── */
+CALL {
+  /* 1 ▸ size + density (fast) */
+  CALL gds.graph.list('artistInfluence6020')
+  YIELD nodeCount, relationshipCount, density
+  RETURN
+    nodeCount         AS vertices,
+    relationshipCount AS edges,
+    round(density,8)  AS density
+}
+CALL {
+  /* 2 ▸ degree stats (stream + aggregate) */
+  CALL gds.degree.stream('artistInfluence6020')
+  YIELD score                       /* total degree of one artist */
+  RETURN
+    min(score)         AS minDeg,
+    round(avg(score),2) AS avgDeg,
+    max(score)         AS maxDeg
+}
 RETURN
-  nodeCount            AS vertices,
-  relationshipCount    AS edges,
-  round(density,8)     AS density,
-  degreeDistribution.minimum AS minDegree,
-  round(degreeDistribution.mean,2) AS avgDegree,
-  degreeDistribution.maximum AS maxDegree;
+  vertices,
+  edges,
+  density,
+  minDeg,
+  avgDeg,
+  maxDeg;
 
-// 3. Components
-/* weakly-connected */
-CALL gds.wcc.stats('artistInfluence6020')
-YIELD componentCount
-RETURN componentCount AS wcc_components;
+/* components */
+CALL gds.wcc.stats('artistInfluence6020') YIELD componentCount;
+CALL gds.scc.stats('artistInfluence6020') YIELD componentCount;
 
-/* strongly-connected */
-CALL gds.scc.stats('artistInfluence6020')
-YIELD componentCount
-RETURN componentCount AS scc_components;
+/* 3. Path length & diameter */
+/* 100-pair sample → average path length & diameter */
+MATCH (a:Artist)
+WITH collect(a) AS all
+WITH apoc.coll.randomItems(all, 100, false) AS sample
 
-// 4. Distance measures
-/* approximate diameter */
-CALL gds.alpha.diameter.approximate.stream('artistInfluence6020')
-YIELD eccentricity
-RETURN max(eccentricity) AS diameter;
+UNWIND sample AS source
+UNWIND sample AS target
+WITH source, target WHERE id(source) < id(target)
 
-/* average shortest-path length (undirected) */
-CALL gds.alpha.shortestPath.avg('artistInfluence6020')
-YIELD averageShortestPath
-RETURN round(averageShortestPath,2) AS avg_path_length;
+CALL apoc.algo.dijkstra(source, target, 'INFLUENCE>', 'weight')
+YIELD weight                                     // weight = hop-count
+RETURN
+  round(avg(weight), 2) AS avg_path_length,
+  max(weight)          AS diameter;
