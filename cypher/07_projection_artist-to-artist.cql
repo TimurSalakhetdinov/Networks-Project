@@ -33,25 +33,35 @@ CALL gds.graph.project.cypher(
 );
 
 // 2. Basic size and degree distribution
-/* size & degree */
-/* ── combined network-metrics query ─────────────────────────── */
 CALL {
-  /* 1 ▸ size + density (fast) */
+  /* size & density */
   CALL gds.graph.list('artistInfluence6020')
   YIELD nodeCount, relationshipCount, density
   RETURN
-    nodeCount         AS vertices,
-    relationshipCount AS edges,
-    round(density,8)  AS density
+    nodeCount            AS vertices,
+    relationshipCount    AS edges,
+    round(density,8)     AS density
 }
 CALL {
-  /* 2 ▸ degree stats (stream + aggregate) */
+  /* degree statistics */
   CALL gds.degree.stream('artistInfluence6020')
-  YIELD score                       /* total degree of one artist */
+  YIELD score
   RETURN
-    min(score)         AS minDeg,
-    round(avg(score),2) AS avgDeg,
-    max(score)         AS maxDeg
+    min(score)           AS minDeg,
+    round(avg(score),2)  AS avgDeg,
+    max(score)           AS maxDeg
+}
+CALL {
+  /* weakly-connected components */
+  CALL gds.wcc.stats('artistInfluence6020')
+  YIELD componentCount
+  RETURN componentCount  AS wcc_components
+}
+CALL {
+  /* strongly-connected components */
+  CALL gds.scc.stats('artistInfluence6020')
+  YIELD componentCount
+  RETURN componentCount  AS scc_components
 }
 RETURN
   vertices,
@@ -59,11 +69,9 @@ RETURN
   density,
   minDeg,
   avgDeg,
-  maxDeg;
-
-/* components */
-CALL gds.wcc.stats('artistInfluence6020') YIELD componentCount;
-CALL gds.scc.stats('artistInfluence6020') YIELD componentCount;
+  maxDeg,
+  wcc_components,
+  scc_components;
 
 /* 3. Path length & diameter */
 /* 100-pair sample → average path length & diameter */
