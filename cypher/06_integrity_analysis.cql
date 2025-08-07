@@ -54,7 +54,13 @@ CALL {
 RETURN metric, value
 ORDER BY metric;
 
-// Degree Centrality
-MATCH (a:Artist)-[:COVERED]->(s:Song)
-RETURN a.name AS Artist, COUNT(*) AS Num_Covers
-ORDER BY Num_Covers DESC LIMIT 10;
+// delete original songs with no performer
+MATCH (s:Song)
+WHERE NOT ( (:Artist)-[:PERFORMED]->(s) )
+DETACH DELETE s;
+
+// delete covers that miss either link
+MATCH (c:Cover)
+WHERE NOT ( (:Artist)-[:PERFORMED]->(c) )
+   OR NOT ( (c)-[:COVER_OF]->(:Song) )
+DETACH DELETE c;
