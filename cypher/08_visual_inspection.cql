@@ -1,3 +1,9 @@
-// Preview a sample artist network
-MATCH (a:Artist)-[:COVERED]->(s:Song)-[:COVER_OF]->(o:Song)<-[:PERFORMED]-(orig:Artist)
-RETURN a.name, s.title, orig.name LIMIT 50;
+// Bloom search bar
+Artist-[:INFLUENCE]->Artist
+
+// Create a Search Phrase in Bloom (Perspective -> Saved Cypher)
+// Add Search Phrase: Influential Artists and Cypher:
+MATCH (a:Artist)-[:INFLUENCE]->()
+WITH a, count(*) AS influences
+WHERE influences > 20
+RETURN a
