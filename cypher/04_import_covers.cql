@@ -1,9 +1,5 @@
 // Import covers from CSV file into Neo4j database
-//        0 · (recommended) fast lookup indexes / constraints
-CREATE CONSTRAINT cover_id_unique  IF NOT EXISTS
-FOR (c:Cover) REQUIRE c.cover_id  IS UNIQUE;
-
-//        1 · batch import  (commit every 2 000 rows)
+// batch import  (commit every 2 000 rows)
 :auto
 CALL {
   LOAD CSV WITH HEADERS FROM 'file:///covers.csv' AS row

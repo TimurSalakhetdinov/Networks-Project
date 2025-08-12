@@ -1,9 +1,5 @@
 // Import original songs from CSV file into Neo4j database
-//        0 · (recommended) fast lookup indexes / constraints
-CREATE INDEX song_id_index IF NOT EXISTS
-FOR (s:Song) ON (s.song_id);
-
-//        1 · batch import  (commit every 2 000 rows)
+// batch import  (commit every 2 000 rows)
 :auto
 CALL {
   // 1 ─ read the CSV, keep rows that have a perf_id

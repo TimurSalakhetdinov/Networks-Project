@@ -1,9 +1,5 @@
 // Import releases from CSV file into Neo4j database
-//        0 · (recommended) fast lookup indexes / constraints
-CREATE CONSTRAINT release_id_unique IF NOT EXISTS
-FOR (r:Release) REQUIRE r.release_id IS UNIQUE;
-
-//        1 · batch import  (commit every 2 000 rows)
+// batch import  (commit every 2 000 rows)
 :auto
 CALL {
   // ──────────────── 1 · stream the CSV ─────────────────────────────
