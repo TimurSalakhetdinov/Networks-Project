@@ -3,17 +3,20 @@ CREATE CONSTRAINT artist_id_unique IF NOT EXISTS
 FOR (a:Artist)
 REQUIRE a.artist_id IS UNIQUE;
 
-CREATE CONSTRAINT song_perf_id_unique IF NOT EXISTS
+CREATE CONSTRAINT song_id_unique IF NOT EXISTS
 FOR (s:Song)
-REQUIRE s.perf_id IS UNIQUE;
+REQUIRE s.song_id IS UNIQUE;
 
-CREATE CONSTRAINT cover_perf_id_unique IF NOT EXISTS
+CREATE CONSTRAINT cover_id_unique IF NOT EXISTS
 FOR (c:Cover)
-REQUIRE c.perf_id IS UNIQUE;
+REQUIRE c.cover_id IS UNIQUE;
 
 CREATE CONSTRAINT release_id_unique IF NOT EXISTS
 FOR (r:Release)
 REQUIRE r.release_id IS UNIQUE;
+
+// Check constraints
+SHOW CONSTRAINTS;
 
 // Add these settings to the Neo4j configuration
 dbms.memory.heap.initial_size=4G

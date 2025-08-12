@@ -1,42 +1,44 @@
 // Import original songs from CSV file into Neo4j database
-// batch import  (commit every 2 000 rows)
+// 1. Batch import (commit every 2 000 rows)
 :auto
 CALL {
-  // 1 ─ read the CSV, keep rows that have a perf_id
+  // 1 ─ Read the CSV, keep rows that have a perf_id
   LOAD CSV WITH HEADERS FROM 'file:///originals.csv' AS row
   WITH row
-  WHERE row.perf_id <> ''          // skip broken lines
+  WHERE trim(row.perf_id) <> ''          // skip broken lines
 
-  // 2 ─ create or update the Song node
+  // 2 ─ Create or update the Song node
   MERGE (s:Song {
-          song_id:  toInteger(row.perf_id)   // unique key
+          song_id: toInteger(trim(row.perf_id))   // unique key
         })
-  SET   s.title = row.song_title,
-        s.year  = CASE row.release_year
-                  WHEN '' THEN NULL ELSE toInteger(row.release_year) END
+  SET   s.title = trim(row.song_title),
+        s.year  = CASE 
+                    WHEN trim(row.release_year) = '' THEN NULL
+                    ELSE toInteger(floor(toFloat(trim(row.release_year))))
+                  END
 
-  // 3 ─ get the list of original-artist ids cleanly
+  // 3 ─ Get the list of original-artist ids cleanly
   WITH s,
-       // remove both [ and ], then split on space or comma
        [id IN split(
                 trim(replace(replace(row.org_art_id,'[',''),']','')),
-                ' ')
-        | trim(id)]          AS rawIds
+                ',')
+        | trim(id)] AS rawIds
 
   UNWIND rawIds AS artistId
   WITH s, artistId
-  WHERE artistId <> ''               // filter out empties
+  WHERE artistId IS NOT NULL AND artistId <> ''  // filter out empties
 
-  // 4 ─ connect artist → song
+  // 4 ─ Connect artist → song
   MATCH (a:Artist {artist_id: toInteger(artistId)})
   MERGE (a)-[:PERFORMED]->(s)
-} IN TRANSACTIONS OF 2000 ROWS
+} IN TRANSACTIONS OF 2000 ROWS;
 
-// 3 . Sanity checks after it finishes
+
+// 2. Sanity checks after it finishes
 // Songs created
 MATCH (s:Song) RETURN count(s);
 
-// Artist-→Song links created
+// Artist→Song links created
 MATCH (:Artist)-[r:PERFORMED]->(:Song) RETURN count(r);
 
 // Random sample
