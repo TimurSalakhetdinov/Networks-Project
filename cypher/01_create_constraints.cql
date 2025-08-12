@@ -24,4 +24,4 @@ dbms.memory.heap.max_size=4G
 dbms.memory.pagecache.size=512m
 dbms.memory.transaction.global_max_size=2G
 
-// Add CSV files to import folder of Neo4j
+// Add CSV files to import folder of Neo4j through dots -> Open folder Import
