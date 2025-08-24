@@ -111,3 +111,9 @@ RETURN
   scc_components,
   round(avg(hops), 2) AS avg_path_length,
   max(hops)           AS diameter;
+
+// Write weakly-connected components back to the graph
+  CALL gds.wcc.write(
+  'artistInfluence6020',
+  { writeProperty: 'wccId' }
+);
