@@ -18,7 +18,6 @@ _A network analysis of cover-song influence using SecondHandSongs and Neo4j_
 ├── artists_nodes.csv
 ├── influence_edges.csv
 ├── influence.graphml
-├── Network Analysis Report.pdf
 ├── README.md
 ├── .gitignore
 ```
@@ -147,4 +146,4 @@ CALL apoc.export.graphml.query(
 ## 📖 References
 
 - Dataset: [SecondHandSongs](https://secondhandsongs.com)  
-- Abe (2009), Zhang et al. (2020), Simon et al. (2021) — referenced in the report.  
+- Abe (2009), Zhang et al. (2020), Simon et al. (2021).  
