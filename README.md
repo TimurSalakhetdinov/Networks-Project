@@ -1,23 +1,50 @@
-# Artist Influence Network – Export & Analysis Guide
+# Artist Influence Network (1960–2020)  
+_A network analysis of cover-song influence using SecondHandSongs and Neo4j_
 
-This project extracts an **Artist Influence Network** from Neo4j, exports it to CSV (and optionally GraphML), and loads it into Python/NetworkX for analysis.
-
----
-
-## 📂 Files
-
-| File                     | Description |
-|--------------------------|-------------|
-| `influence_edges.csv`    | Directed edges between artists (`src_id` → `dst_id`) with attributes (`weight`, `avg_time_gap`). |
-| `artists_nodes.csv`      | Node list with artist metadata (`id`, `artist_id`, `name`, `birth_year`, `death_year`, `country`). |
-| `influence.graphml`      | *(Optional)* Single GraphML file containing both nodes and edges for import into NetworkX, Gephi, or Cytoscape. |
+> Who was the most influential music artist between 1960 and 2020?  
+> We model influence as **who covers whom**, build a directed, weighted graph in **Neo4j (GDS + APOC)**, analyze it in **Cypher queries (Neo4j GDS)**, and visualize in **Neo4j Bloom**.  
+> Across centrality metrics (In-Degree, PageRank, Betweenness) and a composite score, **The Beatles** emerge as the top artist.
 
 ---
 
-## 1️⃣ Exporting from Neo4j
+## 📂 Repository Structure
 
-### **APOC configuration**
-Add the following lines to your `apoc.conf` (in `<dbms-folder>/conf/`):
+```
+.
+├── data/
+├── visuals/
+├── queries_cypher/
+│
+├── artists_nodes.csv
+├── influence_edges.csv
+├── influence.graphml
+├── Network Analysis Report.pdf
+├── README.md
+├── .gitignore
+```
+
+## 🚀 Reproduce in Neo4j (Cypher + GDS) — End‑to‑End
+
+The full process to create the graph projection, compute centrality metrics (In-Degree, PageRank, Betweenness), transform data, and extract top artists by metric is provided as Cypher scripts in the `queries_cypher/` folder.
+
+### K‑Means on Centrality Profiles (GDS Beta)
+
+K-Means clustering on centrality profiles and subsequent analysis of cluster centroids can be found in the `queries_cypher/` folder.
+
+### Bloom Views
+
+Instructions and Cypher queries to filter nodes by cluster, style node size and color, and draw subgraphs for visualization in Neo4j Bloom are included in the `queries_cypher/` folder.
+
+---
+
+## 📦 Neo4j Environment
+
+- Neo4j 5.x  
+- Graph Data Science (GDS) 2.x  
+- APOC 5.x  
+- Neo4j Bloom (desktop or server)  
+
+Ensure `apoc.conf` includes the following flags:
 
 ```properties
 apoc.export.file.enabled=true
@@ -26,12 +53,27 @@ apoc.export.file.use_neo4j_config=true
 apoc.import.file.use_neo4j_config=true
 ```
 
-Restart the DBMS after saving.
+Restart Neo4j after modifying configuration.
 
 ---
 
-### **Export edges (INFLUENCE relationships)**
+## 🔧 Data Pipeline
 
+### 1. Extract from Neo4j
+
+We use **APOC procedures** to export nodes and edges.  
+Ensure `apoc.conf` (in `<dbms-folder>/conf/`) contains:
+
+```properties
+apoc.export.file.enabled=true
+apoc.import.file.enabled=true
+apoc.export.file.use_neo4j_config=true
+apoc.import.file.use_neo4j_config=true
+```
+
+Restart Neo4j after changes.
+
+#### Export edges
 ```cypher
 CALL apoc.export.csv.query(
   '
@@ -44,10 +86,7 @@ CALL apoc.export.csv.query(
 );
 ```
 
----
-
-### **Export nodes (Artists)**
-
+#### Export nodes
 ```cypher
 CALL apoc.export.csv.query(
   '
@@ -64,10 +103,7 @@ CALL apoc.export.csv.query(
 );
 ```
 
----
-
-### **(Optional) Export GraphML**
-
+#### (Optional) Export GraphML
 ```cypher
 CALL apoc.export.graphml.query(
   '
@@ -79,58 +115,36 @@ CALL apoc.export.graphml.query(
 );
 ```
 
-All exported files will be saved in the DBMS **`import/`** directory.
-
 ---
 
-## 2️⃣ Loading into Python
+## 📊 Analysis Highlights
 
-```python
-import pandas as pd
-import networkx as nx
+- **Centrality metrics**  
+  - *In-Degree:* measures how often an artist is covered.  
+  - *PageRank:* weights influence recursively.  
+  - *Betweenness:* captures “bridges” in influence flow.  
 
-# Load data
-edges = pd.read_csv("influence_edges.csv")
-nodes = pd.read_csv("artists_nodes.csv")
+- **Results (from Cypher shown above)**  
+  - The Beatles dominate all metrics.  
+  - Other key influencers: Bob Dylan, Elvis Presley, and Rolling Stones.  
+  - Communities reveal genre clusters (rock, jazz, pop).  
+  - Note: PageRank computed with **dampingFactor = 0.85**, In-Degree computed with **orientation = 'REVERSE'**.
 
-# Create directed graph with edge attributes
-G = nx.from_pandas_edgelist(
-    edges,
-    source="src_id",
-    target="dst_id",
-    edge_attr=["weight", "avg_time_gap"],
-    create_using=nx.DiGraph()
-)
-
-# Attach node attributes
-node_attrs = nodes.set_index("id").to_dict(orient="index")
-nx.set_node_attributes(G, node_attrs)
-
-# Sanity check
-print(G.number_of_nodes(), "nodes,", G.number_of_edges(), "edges")
-
-# Example: weighted out-degree centrality
-out_strength = {
-    n: sum(d.get("weight", 1) for _,_,d in G.out_edges(n, data=True))
-    for n in G.nodes()
-}
-top10 = sorted(out_strength.items(), key=lambda x: x[1], reverse=True)[:10]
-print("Top-10 by influence weight:", top10)
-```
-
----
-
-## 3️⃣ Analysis Ideas
-
-- **Centrality measures:** Degree, betweenness, PageRank.
-- **Communities:** Use Louvain or Girvan–Newman to find clusters.
-- **Time patterns:** Analyze `avg_time_gap` between influences.
-- **Visualization:** Plot in NetworkX, Gephi, or Cytoscape.
+- **Visualization (in Neo4j Bloom)**  
+  - Bloom visualizations highlight “super-influencers” using force-directed layouts.  
+  - Subgraphs of top-50 artists form tightly connected hubs.  
 
 ---
 
 ## 📌 Notes
 
-- Ensure APOC is installed and enabled in Neo4j.
-- The `id(a)` function is used so node IDs match between edges and nodes.
-- If you can’t write to disk, use `{stream:true}` in the export call and download from the Neo4j Browser.
+- Ensure APOC is installed and enabled.  
+- Node IDs are matched with `id(a)` for consistency.  
+- If file export is disabled, use `{stream:true}` in APOC to download data.  
+
+---
+
+## 📖 References
+
+- Dataset: [SecondHandSongs](https://secondhandsongs.com)  
+- Abe (2009), Zhang et al. (2020), Simon et al. (2021) — referenced in the report.  
